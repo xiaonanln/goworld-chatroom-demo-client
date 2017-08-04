@@ -28,16 +28,23 @@ cc.Class({
     // Add User Scripts Here
     
     onRegister: function() {
-        let loginUser = cc.find("loginUser").getComponent("cc.EditBox")
-        let loginPwd = cc.find("loginPwd").getComponent("cc.EditBox")
-        console.log("注册...", loginUser.string, loginPwd.string )
+        let loginUser = cc.find("loginUser").getComponent("cc.EditBox").string
+        let loginPwd = cc.find("loginPwd").getComponent("cc.EditBox").string
+        console.log("注册...", loginUser, loginPwd )
         
         let account = gameClient.getEntityByType("Account")
         console.log("account", account.toString())
         if (account === null) {
             this.showErrorTip("正在连接服务器，请耐心等待")
+            return 
         }
-        this.showErrorTip("正在连接服务器，请耐心等待")
+        
+        if (loginUser == "" || loginPwd == "") {
+            this.showErrorTip("请输入用户名和密码！")
+            return 
+        }
+        
+        account.callServer("Register", loginUser, loginPwd)
     }, 
     
     onLogin: function() {

@@ -125,7 +125,7 @@ cc.Class({
                 console.log("MT_CREATE_ENTITY_ON_CLIENT", "isPlayer", isPlayer, 'eid', eid,"typeName", typeName, 'position', x, y, z, 'yaw', yaw, 'clientData', JSON.stringify(clientData))
                 
                 var e = new ClientEntity()
-                e.create( typeName, eid )
+                e.create( this, typeName, eid )
                 this.entities[eid] = e
                 this.onEntityCreated(e)
                 e.onCreated()

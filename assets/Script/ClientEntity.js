@@ -18,7 +18,7 @@ cc.Class({
             readonly: true, 
         },
         
-        entityID: {
+        ID: {
             default: '', 
             readonly: true, 
         }
@@ -30,9 +30,10 @@ cc.Class({
         
     },
 
-    create: function(typeName, entityID) {
+    create: function(owner, typeName, entityID) {
+        this.owner = owner 
         this.typeName = typeName
-        this.entityID = entityID
+        this.ID = entityID
     },
 
     toString: function() {
@@ -48,5 +49,11 @@ cc.Class({
     // called every frame, uncomment this function to activate update callback
     update: function (dt) {
         console.log("GameClient tick")
+    },
+    
+    callServer: function( method ) {
+        var args = Array.prototype.slice.call(arguments);
+        args = args.slice(1)
+        this.owner.callServerMethod( this.ID, args )
     },
 });
