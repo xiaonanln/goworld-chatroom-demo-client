@@ -87,6 +87,10 @@ cc.Class({
         this.getGoWorld().showErrorTip(msg)
     },
     
+    OnRecvChat: function(text) {
+        this.getGoWorld()
+    },
+
     getGoWorld: function() {
         let goworld = cc.find("GoWorld").getComponent("GoWorld")
         return goworld

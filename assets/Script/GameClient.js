@@ -158,6 +158,8 @@ cc.Class({
             this.handleCallEntityMethodOnClient(payload)
         } else if (msgtype == MT_DESTROY_ENTITY_ON_CLIENT) {
             this.handleDestroyEntityOnClient(payload)
+        } else if (msgtype == MT_CALL_FILTERED_CLIENTS) {
+            this.handleCallFilteredClients(payload)
         }
     },
 
@@ -225,6 +227,16 @@ cc.Class({
             return 
         }
         e.onCall( method, args )
+    },
+
+    handleCallFilteredClients: function(payload) {
+		var [fkey, payload] = this.readVarStr(payload)
+		var [fval, payload] = this.readVarStr(payload)
+		var [method, payload] = this.readVarStr(payload)
+        var [args, payload] = this.readArgs(payload)
+        console.log("MT_CALL_FILTERED_CLIENTS", fkey, "=", fval, "method=", method, "args=", args)
+
+        this.player.onCall( method, args )
     },
 
     readUint8: function(buf) {
