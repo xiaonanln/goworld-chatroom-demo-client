@@ -37,7 +37,7 @@ cc.Class({
     },
 
     toString: function() {
-        return this.typeName + "<" + this.entityID + ">"
+        return this.typeName + "<" + this.ID + ">"
     },
 
     onCreated: function() {
@@ -54,6 +54,6 @@ cc.Class({
     callServer: function( method ) {
         var args = Array.prototype.slice.call(arguments);
         args = args.slice(1)
-        this.owner.callServerMethod( this.ID, args )
+        this.owner.callServerMethod( this, method, args )
     },
 });

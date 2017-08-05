@@ -7,6 +7,31 @@ const _RECV_PAYLOAD = 2
 const CLIENTID_LENGTH = 16
 const ENTITYID_LENGTH = 16
 
+const SIZE_FIELD_SIZE = 4
+
+const MT_INVALID = 0
+// Server Messages
+const MT_SET_GAME_ID = 1
+const MT_SET_GATE_ID = 2
+const MT_NOTIFY_CREATE_ENTITY = 3
+const MT_NOTIFY_DESTROY_ENTITY = 4
+const MT_DECLARE_SERVICE = 5
+const MT_UNDECLARE_SERVICE = 6
+const MT_CALL_ENTITY_METHOD = 7
+const MT_CREATE_ENTITY_ANYWHERE = 8
+const MT_LOAD_ENTITY_ANYWHERE = 9
+const MT_NOTIFY_CLIENT_CONNECTED = 10
+const MT_NOTIFY_CLIENT_DISCONNECTED = 11
+const MT_CALL_ENTITY_METHOD_FROM_CLIENT = 12
+const MT_SYNC_POSITION_YAW_FROM_CLIENT = 13
+const MT_NOTIFY_ALL_GAMES_CONNECTED = 14
+const MT_NOTIFY_GATE_DISCONNECTED = 15
+const MT_START_FREEZE_GAME = 16
+const MT_START_FREEZE_GAME_ACK = 17
+// Message types for migrating
+const MT_MIGRATE_REQUEST = 18
+const MT_REAL_MIGRATE = 19
+
 const MT_GATE_SERVICE_MSG_TYPE_START = 1000
 const MT_REDIRECT_TO_GATEPROXY_MSG_TYPE_START = 1001 // messages that should be redirected to client proxy
 const MT_CREATE_ENTITY_ON_CLIENT = 1002
@@ -52,6 +77,10 @@ cc.Class({
         this.recvStatus = _RECV_PAYLOAD_LENGTH
         this.recvPayloadLen = 0
         this.entities = {}
+        
+        this.sendBuf = new ArrayBuffer(1024*1024)
+        this.sendBufWritePos = SIZE_FIELD_SIZE
+        
         this.connect()
     },
 
@@ -174,11 +203,55 @@ cc.Class({
         return [b, buf]
     },
 
+    appendUint8: function(v) {
+        let slice = this.sendBuf.slice(this.sendBufWritePos, this.sendBufWritePos+1)
+        new Uint8Array(slice)[0] = v
+        this.sendBufWritePos += 1
+    },
+    appendUint16: function(v) {
+        let slice = this.sendBuf.slice(this.sendBufWritePos, this.sendBufWritePos+2)
+        new Uint16Array(slice)[0] = v
+        this.sendBufWritePos += 2
+    },
+    appendBytes: function(b) {
+        var slice = this.sendBuf.slice(this.sendBufWritePos, this.sendBufWritePos+b.length)
+        console.log("appendBytes", b.length, slice.byteLength, "sendBufWritePos", this.sendBufWritePos)
+        new Uint8Array(slice).set(b, 0);  
+        this.sendBufWritePos += b.length
+    },
+    appendEntityID: function(eid) {
+        let b = this.string2Uint8Array(eid)
+        console.log("convert", eid, "to", b, b.length)
+        this.appendBytes(b)
+    },
+    sendPacket: function() {
+        let payload = this.sendBuf.slice(SIZE_FIELD_SIZE, this.sendBufWritePos)
+        let payloadLen = payload.byteLength
+        new Uint32Array(this.sendBuf.slice(0, SIZE_FIELD_SIZE))[0] = payloadLen
+        let packet = new Uint8Array(this.sendBuf.slice(0, this.sendBufWritePos))
+        console.log("writing packet", packet.length)
+        this.websocket.send(packet)
+        this.sendBufWritePos = SIZE_FIELD_SIZE
+    },
+    
+    string2Uint8Array: function(str) {
+      let bufView = new Uint8Array(str.length);
+      for (var i=0, strLen=str.length; i<strLen; i++) {
+        bufView[i] = str.charCodeAt(i);
+      }
+      return bufView;
+    },
+    uint8Array2String: function(b) {
+        return String.fromCharCode.apply(null, b)
+    },
+
     connect: function() {
         var serverAddr = 'ws://'+this.serverAddr+':'+this.serverPort+'/ws'
         console.log("正在连接 " + serverAddr + ' ...')
         var websocket = new WebSocket(serverAddr)
-        websocket.binaryType = 'blob'
+        this.websocket = websocket
+        
+        websocket.binaryType = 'arrayBuffer'
         console.log(websocket)
         var gameclient = this
 
@@ -227,5 +300,16 @@ cc.Class({
         }
         return null 
     },
+    
+    callServerMethod: function(entity, method, args) {
+        console.log(">>> "+entity.toString()+"."+method+"("+args+")")
+        // 	packet.AppendUint16(MT_CALL_ENTITY_METHOD_FROM_CLIENT)
+        // 	packet.AppendEntityID(id)
+        // 	packet.AppendVarStr(method)
+        // 	packet.AppendArgs(args)
+        this.appendUint16(MT_CALL_ENTITY_METHOD_FROM_CLIENT)
+        this.appendEntityID(entity.ID)
+        this.sendPacket()
+    }
     
 });
