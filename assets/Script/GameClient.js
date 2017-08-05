@@ -79,7 +79,8 @@ cc.Class({
         this.entities = {}
         
         this.sendBuf = new ArrayBuffer(1024*1024)
-        this.sendBufWritePos = SIZE_FIELD_SIZE
+        this._sendPacket = new DataView(this.sendBuf)
+        this._sendPacketWritePos = SIZE_FIELD_SIZE
         
         this.connect()
     },
@@ -141,17 +142,23 @@ cc.Class({
         console.log("收到包：", payload, payload.byteLength, "，消息类型：", msgtype)
         if (msgtype != MT_CALL_FILTERED_CLIENTS && msgtype != MT_SYNC_POSITION_YAW_ON_CLIENTS) {
             var [dummy, payload] = this.readUint16(payload)
+            console.log("gateid", dummy)
             var [dummy, payload] = this.readBytes(payload, CLIENTID_LENGTH) // read ClientID
+            console.log("clientid", dummy.length)
         }
 
         if (msgtype == MT_CREATE_ENTITY_ON_CLIENT) {
             var [isPlayer, payload] = this.readBool(payload)
+            console.log("isPlayer", isPlayer)
             var [eid, payload] = this.readEntityID(payload)
+            console.log("eid", eid)
             var [typeName, payload] = this.readVarStr(payload)
+            console.log("typeName", typeName)
             var [x, payload] = this.readFloat32(payload)
             var [y, payload] = this.readFloat32(payload)
             var [z, payload] = this.readFloat32(payload)
             var [yaw, payload] = this.readFloat32(payload)
+            console.log("x y z yaw", x, y, z, yaw)
             var [clientData,payload] = this.readVarBytes(payload)
             clientData = msgpack.decode(clientData)
             console.log("MT_CREATE_ENTITY_ON_CLIENT", "isPlayer", isPlayer, 'eid', eid,"typeName", typeName, 'position', x, y, z, 'yaw', yaw, 'clientData', JSON.stringify(clientData))
@@ -165,38 +172,39 @@ cc.Class({
     },
 
     readUint8: function(buf) {
-        let v = new Uint8Array(buf)[0]
-        return [v, buf.slice(1)]
+        let v = buf.getUint8(0)
+        return [v, new DataView(buf.buffer, buf.byteOffset+1)]
     },
     readUint16: function(buf) {
-        let v = new Uint16Array(buf.slice(0, 2))[0]
-        return [v, buf.slice(2)]
+        let v = buf.getUint16(0, true)
+        return [v, new DataView(buf.buffer, buf.byteOffset+2)]
     },
     readUint32: function(buf) {
-        let v = new Uint32Array(buf.slice(0, 4))[0]
-        return [v, buf.slice(4)]
+        let v = buf.getUint32(0, true)
+        return [v, new DataView(buf.buffer, buf.byteOffset+4)]
     },
     readFloat32: function(buf) {
-        let v = new Float32Array(buf.slice(0, 4))[0]
-        return [v, buf.slice(4)]
+        let v = buf.getFloat32(0, true)
+        return [v, new DataView(buf.buffer, buf.byteOffset+4)]
     },
     readBytes: function(buf, length) {
-        let v = new Uint8Array(buf.slice(0, length))
-        return [v, buf.slice(length)]
+        let v = new Uint8Array(buf.buffer, buf.byteOffset, length)
+        return [v, new DataView(buf.buffer, buf.byteOffset+length)]
     },
     readVarBytes: function(buf) {
         var [n, buf] = this.readUint32(buf)
         var [b, buf] = this.readBytes(buf, n)
+        console.log('VarBytes len', n, 'b', b.length)
         return [b, buf]
     },
     readEntityID: function(buf) {
         var [eid, buf] = this.readBytes(buf, ENTITYID_LENGTH)
-        eid = String.fromCharCode.apply(null, eid)
+        eid = this.uint8Array2String(eid)
         return [eid, buf]
     },
     readVarStr: function(buf) {
         var [b, buf] = this.readVarBytes(buf)
-        let s = String.fromCharCode.apply(null, b)
+        let s = this.uint8Array2String(b)
         return [s, buf]
     },
     readBool: function(buf) {
@@ -207,38 +215,52 @@ cc.Class({
     },
 
     appendUint8: function(v) {
-        let slice = this.sendBuf.slice(this.sendBufWritePos, this.sendBufWritePos+1)
-        new Uint8Array(slice)[0] = v
-        this.sendBufWritePos += 1
+        this._sendPacket.setUint8(this._sendPacketWritePos, v)
+        this._sendPacketWritePos += 1
     },
     appendUint16: function(v) {
-        let slice = this.sendBuf.slice(this.sendBufWritePos, this.sendBufWritePos+2)
-        new Uint16Array(slice)[0] = v
-        this.sendBufWritePos += 2
+        this._sendPacket.setUint16(this._sendPacketWritePos, v, true)
+        this._sendPacketWritePos += 2
+    },
+    appendUint32: function(v) {
+        this._sendPacket.setUint32(this._sendPacketWritePos, v, true)
+        this._sendPacketWritePos += 4
     },
     appendBytes: function(b) {
-        var slice = this.sendBuf.slice(this.sendBufWritePos, this.sendBufWritePos+b.length)
-        console.log("appendBytes", b.length, slice.byteLength, "sendBufWritePos", this.sendBufWritePos)
-        new Uint8Array(slice).set(b, 0);  
-        this.sendBufWritePos += b.length
+        new Uint8Array(this._sendPacket.buffer, this._sendPacketWritePos, b.length).set(b, 0);  
+        this._sendPacketWritePos += b.length
     },
     appendEntityID: function(eid) {
         let b = this.string2Uint8Array(eid)
         console.log("convert", eid, "to", b, b.length)
         this.appendBytes(b)
     },
+    appendVarBytes: function(b) {
+        this.appendUint32(b.length)
+        this.appendBytes(b)
+    },
+    appendVarStr: function(s) {
+        let b = this.string2Uint8Array(s)
+        this.appendVarBytes(b)
+    },
+    appendData: function(data) {
+        data = msgpack.encode(data)
+        console.log("msgpack encode:", typeof(data), data.length)
+        this.appendVarBytes(data)
+    },
+    appendArgs: function(args) {
+        console.log("appendArgs", args.length, args)
+        this.appendUint16(args.length)
+        for (var i=0; i<args.length;i++) {
+            this.appendData(args[i])
+        }
+    },
     sendPacket: function() {
-        let payload = this.sendBuf.slice(SIZE_FIELD_SIZE, this.sendBufWritePos)
-        let payloadLen = payload.byteLength
-        new Uint32Array(this.sendBuf.slice(0, SIZE_FIELD_SIZE))[0] = payloadLen
-        let packet = this.sendBuf.slice(0, this.sendBufWritePos)
-        
-        this.sendBufWritePos = SIZE_FIELD_SIZE
-        
-        console.log("writing packet", packet.byteLength, 
-            "payloadLen", payloadLen, "packetPayloadLen",
-            new Uint32Array(packet.slice(0, SIZE_FIELD_SIZE))[0])
-        this.websocket.send(packet)
+        let payloadLen = this._sendPacketWritePos - SIZE_FIELD_SIZE
+        this._sendPacket.setUint32(0, payloadLen, true)
+        let packetLen = this._sendPacketWritePos
+        this._sendPacketWritePos = SIZE_FIELD_SIZE
+        this.websocket.send(this.sendBuf.slice(0, packetLen))
     },
     
     string2Uint8Array: function(str) {
@@ -317,6 +339,8 @@ cc.Class({
 
         this.appendUint16(MT_CALL_ENTITY_METHOD_FROM_CLIENT)
         this.appendEntityID(entity.ID)
+        this.appendVarStr(method)
+        this.appendArgs(args)
         this.sendPacket()
     }
     
