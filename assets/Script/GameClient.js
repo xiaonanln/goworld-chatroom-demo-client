@@ -108,25 +108,26 @@ cc.Class({
 
     // 从已经收到的数据（recvBuf）里解析出数据包（Packet）
     tryReceivePacket: function() {
+        let recvBufView = new DataView(this.recvBuf)
         if (this.recvStatus == _RECV_PAYLOAD_LENGTH) {
-            if (this.recvBuf.byteLength < 4) {
+            if (this.recvBuf.byteLength < SIZE_FIELD_SIZE) {
                 return null
             }
-            [this.recvPayloadLen, this.recvBuf] = this.readUint32(this.recvBuf)
+            this.recvPayloadLen = recvBufView.getUint32(0, true)
             console.log("数据包大小: ", this.recvPayloadLen)
             this.recvStatus = _RECV_PAYLOAD
         }
 
         // recv status == _RECV_PAYLOAD
-        console.log("包大小：", this.recvPayloadLen, "现有数据：", this.recvBuf.byteLength)
-        if (this.recvBuf.byteLength < this.recvPayloadLen) {
+        console.log("包大小：", this.recvPayloadLen, "现有数据：", this.recvBuf.byteLength - SIZE_FIELD_SIZE)
+        if (this.recvBuf.byteLength - SIZE_FIELD_SIZE < this.recvPayloadLen) {
             // payload not enough
             return null
         }
 
         // 足够了，返回包数据
-        var payload = this.recvBuf.slice(0, this.recvPayloadLen)
-        this.recvBuf = this.recvBuf.slice(this.recvPayloadLen)
+        var payload = this.recvBuf.slice(SIZE_FIELD_SIZE, SIZE_FIELD_SIZE+this.recvPayloadLen)
+        this.recvBuf = this.recvBuf.slice(SIZE_FIELD_SIZE+this.recvPayloadLen)
         // 恢复到接收长度状态
         this.recvStatus = _RECV_PAYLOAD_LENGTH
         this.recvPayloadLen = 0
@@ -134,31 +135,33 @@ cc.Class({
     },
 
     onReceivePacket: function (payload) {
-            var [msgtype, payload] = this.readUint16(payload)
-            console.log("收到包：", payload, payload.byteLength, "，消息类型：", msgtype)
-            if (msgtype != MT_CALL_FILTERED_CLIENTS && msgtype != MT_SYNC_POSITION_YAW_ON_CLIENTS) {
-                var [dummy, payload] = this.readUint16(payload)
-                var [dummy, payload] = this.readBytes(payload, CLIENTID_LENGTH) // read ClientID
-            }
+        // payload is ArrayBuffer
+        payload = new DataView(payload) // 转换为DataView便于操作
+        var [msgtype, payload] = this.readUint16(payload)
+        console.log("收到包：", payload, payload.byteLength, "，消息类型：", msgtype)
+        if (msgtype != MT_CALL_FILTERED_CLIENTS && msgtype != MT_SYNC_POSITION_YAW_ON_CLIENTS) {
+            var [dummy, payload] = this.readUint16(payload)
+            var [dummy, payload] = this.readBytes(payload, CLIENTID_LENGTH) // read ClientID
+        }
 
-            if (msgtype == MT_CREATE_ENTITY_ON_CLIENT) {
-                var [isPlayer, payload] = this.readBool(payload)
-                var [eid, payload] = this.readEntityID(payload)
-                var [typeName, payload] = this.readVarStr(payload)
-                var [x, payload] = this.readFloat32(payload)
-                var [y, payload] = this.readFloat32(payload)
-                var [z, payload] = this.readFloat32(payload)
-                var [yaw, payload] = this.readFloat32(payload)
-                var [clientData,payload] = this.readVarBytes(payload)
-                clientData = msgpack.decode(clientData)
-                console.log("MT_CREATE_ENTITY_ON_CLIENT", "isPlayer", isPlayer, 'eid', eid,"typeName", typeName, 'position', x, y, z, 'yaw', yaw, 'clientData', JSON.stringify(clientData))
-                
-                var e = new ClientEntity()
-                e.create( this, typeName, eid )
-                this.entities[eid] = e
-                this.onEntityCreated(e)
-                e.onCreated()
-            }
+        if (msgtype == MT_CREATE_ENTITY_ON_CLIENT) {
+            var [isPlayer, payload] = this.readBool(payload)
+            var [eid, payload] = this.readEntityID(payload)
+            var [typeName, payload] = this.readVarStr(payload)
+            var [x, payload] = this.readFloat32(payload)
+            var [y, payload] = this.readFloat32(payload)
+            var [z, payload] = this.readFloat32(payload)
+            var [yaw, payload] = this.readFloat32(payload)
+            var [clientData,payload] = this.readVarBytes(payload)
+            clientData = msgpack.decode(clientData)
+            console.log("MT_CREATE_ENTITY_ON_CLIENT", "isPlayer", isPlayer, 'eid', eid,"typeName", typeName, 'position', x, y, z, 'yaw', yaw, 'clientData', JSON.stringify(clientData))
+            
+            var e = new ClientEntity()
+            e.create( this, typeName, eid )
+            this.entities[eid] = e
+            this.onEntityCreated(e)
+            e.onCreated()
+        }
     },
 
     readUint8: function(buf) {
@@ -228,10 +231,14 @@ cc.Class({
         let payload = this.sendBuf.slice(SIZE_FIELD_SIZE, this.sendBufWritePos)
         let payloadLen = payload.byteLength
         new Uint32Array(this.sendBuf.slice(0, SIZE_FIELD_SIZE))[0] = payloadLen
-        let packet = new Uint8Array(this.sendBuf.slice(0, this.sendBufWritePos))
-        console.log("writing packet", packet.length)
-        this.websocket.send(packet)
+        let packet = this.sendBuf.slice(0, this.sendBufWritePos)
+        
         this.sendBufWritePos = SIZE_FIELD_SIZE
+        
+        console.log("writing packet", packet.byteLength, 
+            "payloadLen", payloadLen, "packetPayloadLen",
+            new Uint32Array(packet.slice(0, SIZE_FIELD_SIZE))[0])
+        this.websocket.send(packet)
     },
     
     string2Uint8Array: function(str) {
@@ -251,7 +258,7 @@ cc.Class({
         var websocket = new WebSocket(serverAddr)
         this.websocket = websocket
         
-        websocket.binaryType = 'arrayBuffer'
+        websocket.binaryType = 'arraybuffer'
         console.log(websocket)
         var gameclient = this
 
@@ -307,6 +314,7 @@ cc.Class({
         // 	packet.AppendEntityID(id)
         // 	packet.AppendVarStr(method)
         // 	packet.AppendArgs(args)
+
         this.appendUint16(MT_CALL_ENTITY_METHOD_FROM_CLIENT)
         this.appendEntityID(entity.ID)
         this.sendPacket()

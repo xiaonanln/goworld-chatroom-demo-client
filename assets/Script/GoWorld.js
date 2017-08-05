@@ -33,7 +33,7 @@ cc.Class({
         console.log("注册...", loginUser, loginPwd )
         
         let account = gameClient.getEntityByType("Account")
-        console.log("account", account.toString())
+        console.log("account", account !== null ? account.toString():null)
         if (account === null) {
             this.showErrorTip("正在连接服务器，请耐心等待")
             return 
