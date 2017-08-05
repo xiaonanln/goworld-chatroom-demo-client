@@ -34,6 +34,7 @@ cc.Class({
         this.owner = owner 
         this.typeName = typeName
         this.ID = entityID
+        this.isPlayer = false
     },
 
     toString: function() {
@@ -55,5 +56,39 @@ cc.Class({
         var args = Array.prototype.slice.call(arguments);
         args = args.slice(1)
         this.owner.callServerMethod( this, method, args )
+    },
+
+    onCall: function(method, args) {
+        console.log(this.toString()+"."+method+"("+args+")")
+        this[method](...args)
+    },
+
+    onBecomePlayer: function() {
+        let scene = cc.director.getScene()
+        
+        console.log("获得玩家对象：", this.toString(), scene.name)
+        if (this.typeName == "Avatar") {
+            // 玩家登录成功！
+            this.getGoWorld().onAvatarLoginSuccess( this )
+        } else if (this.typeName == "Account") {
+            // 账号创建成功，可以开始登陆
+            if (scene.name != "login") {
+                cc.director.loadScene("login");
+            }
+        }
+    },
+
+    // Put Client Methods Here 
+    ShowError: function(msg) {
+        this.getGoWorld().showErrorTip(msg)
+    },
+
+    ShowInfo: function(msg) {
+        this.getGoWorld().showErrorTip(msg)
+    },
+    
+    getGoWorld: function() {
+        let goworld = cc.find("GoWorld").getComponent("GoWorld")
+        return goworld
     },
 });

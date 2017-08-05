@@ -1,7 +1,5 @@
 let GameClient = require("GameClient")
 
-var gameClient
-
 cc.Class({
     extends: cc.Component,
 
@@ -16,13 +14,16 @@ cc.Class({
 
     // use this for initialization
     onLoad: function () {
-        gameClient = new GameClient()
-        gameClient.serverAddr = this.serverAddr
-        gameClient.serverPort = this.serverPort
+        if (!cc.gameClient) {
+            cc.gameClient = new GameClient()
+            cc.gameClient.serverAddr = this.serverAddr
+            cc.gameClient.serverPort = this.serverPort
+            cc.gameClient.onLoad()
+        }
+
         this.errorLabel = cc.find("ErrorLabel")
         console.log("errorLabel", this.errorLabel, this.errorLabel.enabled)
         this.errorLabel.active = false
-        gameClient.onLoad()
     },
 
     // Add User Scripts Here
@@ -32,7 +33,7 @@ cc.Class({
         let loginPwd = cc.find("loginPwd").getComponent("cc.EditBox").string
         console.log("注册...", loginUser, loginPwd )
         
-        let account = gameClient.getEntityByType("Account")
+        let account = cc.gameClient.getEntityByType("Account")
         console.log("account", account !== null ? account.toString():null)
         if (account === null) {
             this.showErrorTip("正在连接服务器，请耐心等待")
@@ -48,16 +49,43 @@ cc.Class({
     }, 
     
     onLogin: function() {
-        console.log("登录...")
+        let loginUser = cc.find("loginUser").getComponent("cc.EditBox").string
+        let loginPwd = cc.find("loginPwd").getComponent("cc.EditBox").string
+        console.log("登录...", loginUser, loginPwd )
+
+        let account = cc.gameClient.getEntityByType("Account")
+        console.log("account", account !== null ? account.toString():null)
+        if (account === null) {
+            this.showErrorTip("正在连接服务器，请耐心等待")
+            return 
+        }
+        
+        if (loginUser == "" || loginPwd == "") {
+            this.showErrorTip("请输入用户名和密码！")
+            return 
+        }
+
+        account.callServer("Login", loginUser, loginPwd)
     }, 
+        
+    onSendChat: function() {
+        let inputText = cc.find("/OutterLayout/BottomLayout/InputBox").getComponent("cc.EditBox").string
+        console.log("发送", inputText)
+        cc.gameClient.player.callServer("SendChat", inputText)
+    },
     
-    showErrorTip:function(msg) {
+    showErrorTip: function(msg) {
         this.errorLabel.getComponent("cc.Label").string = msg
         this.errorLabel.active = true
         this.scheduleOnce(function(){
             this.errorLabel.active = false
         }, 0.5)
-    }
+    },
+
+    onAvatarLoginSuccess: function() {
+        console.log("玩家登录成功！")
+        cc.director.loadScene("chat");
+    },
     // called every frame, uncomment this function to activate update callback
     // update: function (dt) {
 

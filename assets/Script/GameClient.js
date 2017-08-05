@@ -77,6 +77,7 @@ cc.Class({
         this.recvStatus = _RECV_PAYLOAD_LENGTH
         this.recvPayloadLen = 0
         this.entities = {}
+        this.player = null
         
         this.sendBuf = new ArrayBuffer(1024*1024)
         this._sendPacket = new DataView(this.sendBuf)
@@ -101,9 +102,13 @@ cc.Class({
         }
 
         console.log("未处理数据：", this.recvBuf.byteLength)
-        let payload = this.tryReceivePacket()
-        if (payload !== null) {
-            this.onReceivePacket(payload)
+        while (true) {
+            let payload = this.tryReceivePacket()
+            if (payload !== null) {
+                this.onReceivePacket(payload)
+            } else {
+                break 
+            }
         }
     },
 
@@ -148,17 +153,22 @@ cc.Class({
         }
 
         if (msgtype == MT_CREATE_ENTITY_ON_CLIENT) {
+            this.handleCreateEntityOnClient(payload)
+        } else if (msgtype == MT_CALL_ENTITY_METHOD_ON_CLIENT) {
+            this.handleCallEntityMethodOnClient(payload)
+        } else if (msgtype == MT_DESTROY_ENTITY_ON_CLIENT) {
+            this.handleDestroyEntityOnClient(payload)
+        }
+    },
+
+    handleCreateEntityOnClient: function(payload) {
             var [isPlayer, payload] = this.readBool(payload)
-            console.log("isPlayer", isPlayer)
             var [eid, payload] = this.readEntityID(payload)
-            console.log("eid", eid)
             var [typeName, payload] = this.readVarStr(payload)
-            console.log("typeName", typeName)
             var [x, payload] = this.readFloat32(payload)
             var [y, payload] = this.readFloat32(payload)
             var [z, payload] = this.readFloat32(payload)
             var [yaw, payload] = this.readFloat32(payload)
-            console.log("x y z yaw", x, y, z, yaw)
             var [clientData,payload] = this.readVarBytes(payload)
             clientData = msgpack.decode(clientData)
             console.log("MT_CREATE_ENTITY_ON_CLIENT", "isPlayer", isPlayer, 'eid', eid,"typeName", typeName, 'position', x, y, z, 'yaw', yaw, 'clientData', JSON.stringify(clientData))
@@ -166,9 +176,55 @@ cc.Class({
             var e = new ClientEntity()
             e.create( this, typeName, eid )
             this.entities[eid] = e
+            if (isPlayer) {
+                e.isPlayer = true
+
+                if (this.player) {
+                    // dupliate player!!!
+                    console.error("玩家对象重复：老玩家"+this.player.toString() + "，新玩家：", e.toString())
+                }
+
+                this.player = e
+            }
             this.onEntityCreated(e)
             e.onCreated()
+
+            if (this.player === e) {
+                e.onBecomePlayer()
+            }
+    },
+
+    handleDestroyEntityOnClient: function(payload) {
+		// typeName := packet.ReadVarStr()
+		// entityID := packet.ReadEntityID()
+        var [typeName, payload] = this.readVarStr(payload)
+        var [entityID, payload] = this.readEntityID(payload)
+        let e = this.entities[entityID]
+        if (e == undefined) {
+            return 
         }
+        
+        delete this.entities[entityID]
+        if (this.player === e) {
+            this.player = null
+            console.log("失去玩家对象：", e.toString()) 
+        }
+    },
+
+    handleCallEntityMethodOnClient: function(payload) {        
+		// entityID := packet.ReadEntityID()
+		// method := packet.ReadVarStr()
+		// args := packet.ReadArgs()
+        var [entityID, payload] = this.readEntityID(payload)
+        var [method, payload] = this.readVarStr(payload)
+        var [args, payload] = this.readArgs(payload)
+        console.log("MT_CALL_ENTITY_METHOD_ON_CLIENT", "entityID", entityID, "method", method, "args", args.length, args)
+        let e = this.entities[entityID]
+        if (e == undefined) {
+            console.log("找不到entity：", entityID)
+            return 
+        }
+        e.onCall( method, args )
     },
 
     readUint8: function(buf) {
@@ -212,6 +268,21 @@ cc.Class({
         [b, buf] = this.readUint8(buf)
         b = b == 0 ? false : true
         return [b, buf]
+    },
+    readData: function(buf) {
+        var [b, buf] = this.readVarBytes(buf)
+        let data = msgpack.decode(b)
+        return [data, buf]
+    },
+    readArgs: function(buf) {
+        var [argcount, buf] = this.readUint16(buf)
+        console.log("readArgs: argcount", argcount)
+        var args = new Array(argcount)
+        for (var i = 0; i<argcount; i++) {
+            var [data, buf] = this.readData(buf)
+            args[i] = data
+        }
+        return [args, buf]
     },
 
     appendUint8: function(v) {
