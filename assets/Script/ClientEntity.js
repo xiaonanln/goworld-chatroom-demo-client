@@ -87,8 +87,8 @@ cc.Class({
         this.getGoWorld().showErrorTip(msg)
     },
     
-    OnRecvChat: function(text) {
-        this.getGoWorld()
+    OnRecvChat: function(name, text) {
+        this.getGoWorld().onRecvChat(name, text)
     },
 
     getGoWorld: function() {

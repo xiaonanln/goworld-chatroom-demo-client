@@ -251,7 +251,7 @@
   },
   {
     "__type__": "cc.Node",
-    "_name": "layout",
+    "_name": "ScrollViewContainer",
     "_objFlags": 0,
     "_parent": {
       "__id__": 6
@@ -582,13 +582,13 @@
     "_cascadeOpacityEnabled": true,
     "_anchorPoint": {
       "__type__": "cc.Vec2",
-      "x": 0.5,
-      "y": 1
+      "x": 0,
+      "y": 0
     },
     "_contentSize": {
       "__type__": "cc.Size",
-      "width": 220,
-      "height": 400
+      "width": 640,
+      "height": 1200
     },
     "_rotationX": 0,
     "_rotationY": 0,
@@ -596,8 +596,8 @@
     "_scaleY": 1,
     "_position": {
       "__type__": "cc.Vec2",
-      "x": 0,
-      "y": 115.31
+      "x": -317,
+      "y": -592
     },
     "_skewX": 0,
     "_skewY": 0,
@@ -643,8 +643,8 @@
     },
     "_contentSize": {
       "__type__": "cc.Size",
-      "width": 240,
-      "height": 250
+      "width": 640,
+      "height": 1200
     },
     "_rotationX": 0,
     "_rotationY": 0,
@@ -652,8 +652,8 @@
     "_scaleY": 1,
     "_position": {
       "__type__": "cc.Vec2",
-      "x": 0,
-      "y": 0
+      "x": -3,
+      "y": 4
     },
     "_skewX": 0,
     "_skewY": 0,
@@ -704,8 +704,8 @@
     "_cascadeOpacityEnabled": true,
     "_anchorPoint": {
       "__type__": "cc.Vec2",
-      "x": 0.5,
-      "y": 0.5
+      "x": 0,
+      "y": 0
     },
     "_contentSize": {
       "__type__": "cc.Size",
@@ -718,8 +718,8 @@
     "_scaleY": 1,
     "_position": {
       "__type__": "cc.Vec2",
-      "x": -183,
-      "y": 30
+      "x": 226,
+      "y": 350
     },
     "_skewX": 0,
     "_skewY": 0,

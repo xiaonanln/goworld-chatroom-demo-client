@@ -24,6 +24,7 @@ cc.Class({
         this.errorLabel = cc.find("ErrorLabel")
         console.log("errorLabel", this.errorLabel, this.errorLabel.enabled)
         this.errorLabel.active = false
+        this.chatItems = new Array()
     },
 
     // Add User Scripts Here
@@ -86,6 +87,39 @@ cc.Class({
         console.log("玩家登录成功！")
         cc.director.loadScene("chat");
     },
+
+    onRecvChat: function(name, text) {
+        console.log(name+" 说：" + text)
+        // let label = new cc.LabelTTF('label text',  'Times New Roman', 32, cc.size(320,32), cc.TEXT_ALIGNMENT_LEFT)
+        let labelNode = new cc.Node()
+        labelNode.setAnchorPoint(0, 0)
+        labelNode.addComponent(cc.Label)
+        labelNode.getComponent(cc.Label).string = "【"+name+"】说：" + text
+        let label2 = cc.find('/OutterLayout/ScrollViewContainer/scrollview/view/content/label')
+        let scrollView = cc.find('/OutterLayout/ScrollViewContainer/scrollview/view/content')
+        console.log(typeof(scrollView), scrollView, typeof(labelNode), labelNode, typeof(label2), label2)
+        labelNode.parent = scrollView
+        this.chatItems.unshift(labelNode)
+        if (this.chatItems.length > 100) {
+            let removeItem = this.chatItems.pop()
+            removeItem.removeFromParent()
+        }
+
+        this.updateChatItemPositions()
+    },
+
+    updateChatItemPositions: function() {
+        let x = 10
+        let ygap = 5
+        var y = 10
+        for (var i=0; i<this.chatItems.length; i++) {
+            let item = this.chatItems[i]
+            item.setPosition(x, y)
+            let size = item.getContentSize()
+            y += size.height + ygap
+        }
+    },
+
     // called every frame, uncomment this function to activate update callback
     // update: function (dt) {
 
