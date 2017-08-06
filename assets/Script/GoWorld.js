@@ -25,6 +25,14 @@ cc.Class({
         console.log("errorLabel", this.errorLabel, this.errorLabel.enabled)
         this.errorLabel.active = false
         this.chatItems = new Array()
+
+        let scene = cc.director.getScene()
+        console.log("GoWorld onLoad: ", scene.name, this.player)
+        if (scene.name == "chat" && cc.gameClient.player ) {
+            let player=cc.gameClient.player
+            let inputTextBox = cc.find("/OutterLayout/BottomLayout/InputBox").getComponent("cc.EditBox")
+            inputTextBox.placeholder="当前聊天室："+player.attrs.chatroom+"，/join 切换聊天室"
+        }
     },
 
     // Add User Scripts Here
@@ -70,9 +78,15 @@ cc.Class({
     }, 
         
     onSendChat: function() {
-        let inputText = cc.find("/OutterLayout/BottomLayout/InputBox").getComponent("cc.EditBox").string
+        let inputTextBox = cc.find("/OutterLayout/BottomLayout/InputBox").getComponent("cc.EditBox")
+        let inputText = inputTextBox.string
         console.log("发送", inputText)
+        if (inputText == "") {
+            return 
+        }
+        inputTextBox.string = ""
         cc.gameClient.player.callServer("SendChat", inputText)
+        
     },
     
     showErrorTip: function(msg) {
@@ -118,6 +132,14 @@ cc.Class({
             let size = item.getContentSize()
             y += size.height + ygap
         }
+    },
+
+    onChatroomChange: function(name) {
+        console.log("聊天室切换到：" + name)
+        let scene = cc.director.getScene()
+        let player=cc.gameClient.player
+        let inputTextBox = cc.find("/OutterLayout/BottomLayout/InputBox").getComponent("cc.EditBox")
+        inputTextBox.placeholder="当前聊天室："+player.attrs.chatroom+"，/join 切换聊天室"
     },
 
     // called every frame, uncomment this function to activate update callback

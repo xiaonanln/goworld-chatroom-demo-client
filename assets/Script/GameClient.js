@@ -160,7 +160,35 @@ cc.Class({
             this.handleDestroyEntityOnClient(payload)
         } else if (msgtype == MT_CALL_FILTERED_CLIENTS) {
             this.handleCallFilteredClients(payload)
+        } else if (msgtype == MT_NOTIFY_MAP_ATTR_CHANGE_ON_CLIENT) {
+            this.handleNotifyMapAttrChangeOnClient(payload)
+        } else if (msgtype == MT_NOTIFY_MAP_ATTR_DEL_ON_CLIENT) {
+
+        } else if (msgtype == MT_NOTIFY_LIST_ATTR_APPEND_ON_CLIENT) {
+
+        } else if (msgtype == MT_NOTIFY_LIST_ATTR_CHANGE_ON_CLIENT) {
+
+        } else if (msgtype == MT_NOTIFY_LIST_ATTR_POP_ON_CLIENT) {
+
+        } else {
+            console.log("无法识别的消息类型："+msgtype)
         }
+    },
+
+    handleNotifyMapAttrChangeOnClient: function(payload) {
+        var [entityID, payload] = this.readEntityID(payload)
+        var [path, payload] = this.readData(payload)
+        var [key, payload] = this.readVarStr(payload)
+        var [val, payload] = this.readData(payload)
+        console.log("MT_NOTIFY_MAP_ATTR_CHANGE_ON_CLIENT", entityID, "path", typeof(path), JSON.stringify(path), path.length, "key", key, "val", val)
+
+        let e = this.entities[entityID]
+        if (!e) {
+            console.log("找不到对象："+entityID)
+            return  
+        }
+
+        e.applyMapAttrChange( path, key, val )
     },
 
     handleCreateEntityOnClient: function(payload) {
@@ -176,7 +204,7 @@ cc.Class({
             console.log("MT_CREATE_ENTITY_ON_CLIENT", "isPlayer", isPlayer, 'eid', eid,"typeName", typeName, 'position', x, y, z, 'yaw', yaw, 'clientData', JSON.stringify(clientData))
             
             var e = new ClientEntity()
-            e.create( this, typeName, eid )
+            e.create( this, typeName, eid, clientData )
             this.entities[eid] = e
             if (isPlayer) {
                 e.isPlayer = true

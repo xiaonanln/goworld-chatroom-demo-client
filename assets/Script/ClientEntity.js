@@ -30,10 +30,11 @@ cc.Class({
         
     },
 
-    create: function(owner, typeName, entityID) {
+    create: function(owner, typeName, entityID, attrs) {
         this.owner = owner 
         this.typeName = typeName
         this.ID = entityID
+        this.attrs = attrs 
         this.isPlayer = false
     },
 
@@ -61,6 +62,36 @@ cc.Class({
     onCall: function(method, args) {
         console.log(this.toString()+"."+method+"("+args+")")
         this[method](...args)
+    },
+
+    applyMapAttrChange: function(path, key, val) {
+        let attr = this.getAttrByPath(path)
+        var rootkey = path.length > 0 ? path[0] : key
+        attr[key] = val 
+
+        this['onAttrChange_'+rootkey]()
+    },
+    
+    applyMapAttrDel: function(path, key) {
+        var rootkey = path.length > 0 ? path[0] : key
+        let attr = this.getAttrByPath(path)
+        delete attr[key]
+
+        this['onAttrChange_'+rootkey]()
+    },
+
+    getAttrByPath: function(path) {
+        var attr = this.attrs
+        for (var i=0; i< path.length;i++) {
+            let key = path[i]
+            attr = attr[key]
+        }
+        return attr 
+    },
+
+    onAttrChange_chatroom: function() {
+        // chatroom changed
+        this.getGoWorld().onChatroomChange( this.attrs.chatroom )
     },
 
     onBecomePlayer: function() {
